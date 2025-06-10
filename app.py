@@ -53,9 +53,9 @@ def main():
             webcam_resized = cv2.resize(webcam_frame, (c.window_width_webcam, c.window_height))
             frames.append(webcam_resized)
 
-        color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q)
+        color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q, similarity_threshold=.1)
         for key, value in color_comparison.items():
-            add_log(f"{key}: {value}")
+            print(f"{key}: {value}")
         
 
         # Status/graph column
