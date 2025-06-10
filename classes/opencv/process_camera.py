@@ -15,6 +15,10 @@ start_time = time.time()
 locked_roi = None  # Store the locked ROI once confidence is 1.0
 ROI_SAVE_PATH = 'storage/tv_roi.json'
 
+# Global variables for tracking TV ROI and logo detection
+tv_roi_locked = False
+logo_detected = False
+
 def save_roi(roi):
     """Save ROI coordinates to JSON file"""
     if roi is not None and len(roi) == 4:
@@ -44,7 +48,7 @@ def load_saved_roi():
     return False
 
 def process_webcam_frame(frame, webcam_avg_colors_q: Queue):
-    global detection_confidence, last_detected_roi, locked_roi
+    global detection_confidence, last_detected_roi, locked_roi, tv_roi_locked, logo_detected
     
     if frame is None:
         h = c.window_height
@@ -68,10 +72,23 @@ def process_webcam_frame(frame, webcam_avg_colors_q: Queue):
         
         # Store color data with timestamp
         if avg_rgb is not None:
+            # Remove old item if queue is full
+            if webcam_avg_colors_q.full():
+                try:
+                    webcam_avg_colors_q.get_nowait()
+                except queue.Empty:
+                    pass
             webcam_avg_colors_q.put(avg_rgb)
     
     # Draw information overlay and get display frame
     display_frame = draw_info(frame, avg_bgr, avg_rgb, roi_contour)
+    
+    # Update TV ROI detection status
+    tv_roi_locked = True  # Set to True when ROI is detected
+    
+    # Update logo detection status
+    logo_detected = True  # Set to True when logo is detected
+    
     return display_frame
 
 def detect_tv_rectangle(frame):
@@ -397,7 +414,7 @@ def update_detection_confidence(current_roi):
 
 def reset_detection():
     """Reset the detection system"""
-    global detection_confidence, last_detected_roi, locked_roi, start_time
+    global detection_confidence, last_detected_roi, locked_roi, start_time, tv_roi_locked, logo_detected
     detection_confidence = 0.0
     last_detected_roi = None
     locked_roi = None
@@ -409,6 +426,8 @@ def reset_detection():
     except Exception as e:
         add_log(f"Error removing ROI file: {e}")
     add_log("Webcam TV ROI reset")
+    tv_roi_locked = False
+    logo_detected = False
 
 def draw_info(frame, avg_bgr, avg_rgb, roi_contour=None):
     """Draw information overlay on frame"""
@@ -442,3 +461,13 @@ def draw_info(frame, avg_bgr, avg_rgb, roi_contour=None):
         cv2.drawContours(display_frame, [roi_contour], -1, (0, 255, 255), 1)
     
     return display_frame
+
+def is_tv_roi_locked():
+    """Return whether the TV ROI is currently locked."""
+    global tv_roi_locked
+    return tv_roi_locked
+
+def is_logo_detected():
+    """Return whether a logo is currently detected."""
+    global logo_detected
+    return logo_detected

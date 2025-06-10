@@ -4,6 +4,7 @@ import time
 from classes.utils.utils import add_log
 import config.config as c
 from queue import Queue
+import queue
 
 roi_x=30
 roi_y=10
@@ -33,6 +34,12 @@ def process_browser_frame(frame, stream_avg_colors_q: Queue):
             q[3] = status
             q[4] = time.time()
         
+        # Remove old item if queue is full
+        if stream_avg_colors_q.full():
+            try:
+                stream_avg_colors_q.get_nowait()
+            except queue.Empty:
+                pass
         stream_avg_colors_q.put(q)
         
         return render_image(frame, logo_detected)

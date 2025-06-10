@@ -44,10 +44,48 @@ def draw_status_overlay_column(frame, status):
         cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
     return frame
 
-def draw_graph_column(stream_history, webcam_history=None):
+def draw_graph_column(stream_history, webcam_history=None, compare_colors=False):
     graph = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
     if not stream_history and not webcam_history:
         return graph
+
+    # Draw status table at the top
+    y_start = 20
+    dy = 20
+    font_scale = 0.4
+    font_thickness = 1
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    # Get current time and NTP time
+    current_time = time.strftime("%H:%M:%S")
+    ntp_time = time.strftime("%H:%M:%S")  # TODO: Replace with actual NTP time
+    
+    # Get TV ROI status
+    from classes.opencv.process_camera import is_tv_roi_locked
+    tv_roi_status = "Locked" if is_tv_roi_locked() else "Unlocked"
+    
+    # Get logo detection status
+    from classes.opencv.process_camera import is_logo_detected
+    logo_status = "Detected" if is_logo_detected() else "Not Detected"
+    
+    # Table rows
+    rows = [
+        ("Compare Colors", "Enabled" if compare_colors else "Disabled"),
+        ("Logo Detected", logo_status),
+        ("Stream Queue", str(len(stream_history))),
+        ("Webcam Queue", str(len(webcam_history) if webcam_history else 0)),
+        ("Running Time", current_time),
+        ("NTP Clock", ntp_time),
+        ("TV ROI", tv_roi_status)
+    ]
+    
+    # Draw table
+    for i, (label, value) in enumerate(rows):
+        y = y_start + i * dy
+        # Draw label
+        cv2.putText(graph, label, (10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
+        # Draw value
+        cv2.putText(graph, value, (c.window_width // 2 + 10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
 
     # Draw color bars from right to left
     bar_width = 1  # 1px width for each bar

@@ -17,17 +17,20 @@ SHOW_WINDOW = True
 USE_WEBCAM = True
 USE_BROWSER = True
 HEADLESS_BROWSER = True
+COMPARE_COLORS = False
 
 def main():
-    global USE_WEBCAM, USE_BROWSER
+    global USE_WEBCAM, USE_BROWSER, COMPARE_COLORS
 
-# Color tracking
+    # Color tracking
     stream_avg_colors_q = Queue(400)
     webcam_avg_colors_q = Queue(400)
     browser_q = Queue(maxsize=5)
     webcam_q = Queue(maxsize=5)
     stats = GraphData(stream_avg_colors_q)
     webcam_stats = GraphData(webcam_avg_colors_q)
+    
+    # Control flags
 
     # Launch threads
     if USE_BROWSER:
@@ -40,7 +43,7 @@ def main():
 
     while True:
         frames = []
-        # Update frames if enabled and available
+        
         if USE_BROWSER and not browser_q.empty():
             raw_browser = browser_q.get()
             browser_frame = process_browser_frame(raw_browser, stream_avg_colors_q)
@@ -53,14 +56,22 @@ def main():
             webcam_resized = cv2.resize(webcam_frame, (c.window_width_webcam, c.window_height))
             frames.append(webcam_resized)
 
-        color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q, similarity_threshold=.1)
-        for key, value in color_comparison.items():
-            print(f"{key}: {value}")
-        
+        # Debug queue sizes
+        stream_size = stream_avg_colors_q.qsize()
+        webcam_size = webcam_avg_colors_q.qsize()
+        # print(f"Queue sizes - Stream: {stream_size}, Webcam: {webcam_size}")
+
+        # Only compare colors when enabled and we have enough data
+        if COMPARE_COLORS and stream_size >= 50 and webcam_size >= 50:
+            add_log('Comparing colors...')
+            color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q, similarity_threshold=.1)
+            for key, value in color_comparison.items():
+                print(f"{key}: {value}")
+        # elif COMPARE_COLORS:
+        #     add_log(f'Waiting for more data: Stream={stream_size}/50, Webcam={webcam_size}/50')
 
         # Status/graph column
-        stats_column = draw_graph_column(stats.get_history(), webcam_stats.get_history())
-        # stats_column = draw_status_overlay_column(stats_column, stats.get_status())
+        stats_column = draw_graph_column(stats.get_history(), webcam_stats.get_history(), COMPARE_COLORS)
         frames.append(stats_column)
 
         # Log panel column
@@ -68,26 +79,47 @@ def main():
         frames.append(log_panel)
 
         if SHOW_WINDOW and frames:
-            combined = np.hstack(frames)
-            cv2.imshow("Real-Time Dashboard", combined)
-            key = cv2.waitKey(1) & 0xFF
+            # Ensure all frames have the same height
+            target_height = c.window_height
+            for i in range(len(frames)):
+                if frames[i].shape[0] != target_height:
+                    frames[i] = cv2.resize(frames[i], (frames[i].shape[1], target_height))
 
-            if key == ord('q'):
-                add_log("Quitting application.")
-                add_log("-" * 50)
-                break
-            elif key == ord('w'):
-                USE_WEBCAM = not USE_WEBCAM
-                add_log(f"Webcam toggled {'ON' if USE_WEBCAM else 'OFF'}")
-                # Start or stop webcam thread
-                if USE_WEBCAM:
-                    Thread(target=capture_webcam, args=(webcam_q,), daemon=True).start()
-            elif key == ord('b'):
-                USE_BROWSER = not USE_BROWSER
-                add_log(f"Browser toggled {'ON' if USE_BROWSER else 'OFF'}")
-                # Start or stop browser thread
-                if USE_BROWSER:
-                    Thread(target=capture_browser, args=(browser_q,), daemon=True).start()
+            try:
+                combined = np.hstack(frames)
+                cv2.imshow("Real-Time Dashboard", combined)
+                key = cv2.waitKey(1) & 0xFF
+
+                if key == ord('q'):
+                    add_log("Quitting application.")
+                    add_log("-" * 50)
+                    break
+                elif key == ord('w'):
+                    USE_WEBCAM = not USE_WEBCAM
+                    add_log(f"Webcam toggled {'ON' if USE_WEBCAM else 'OFF'}")
+                    # Start or stop webcam thread
+                    if USE_WEBCAM:
+                        Thread(target=capture_webcam, args=(webcam_q,), daemon=True).start()
+                elif key == ord('b'):
+                    USE_BROWSER = not USE_BROWSER
+                    add_log(f"Browser toggled {'ON' if USE_BROWSER else 'OFF'}")
+                    # Start or stop browser thread
+                    if USE_BROWSER:
+                        Thread(target=capture_browser, args=(browser_q,), daemon=True).start()
+                elif key == ord('r'):
+                    # Reset TV ROI
+                    from classes.opencv.process_camera import reset_detection
+                    reset_detection()
+                    add_log("TV ROI reset")
+                elif key == ord('c'):
+                    # Toggle color comparison
+                    COMPARE_COLORS = not COMPARE_COLORS
+                    add_log(f"Color comparison {'ENABLED' if COMPARE_COLORS else 'DISABLED'}")
+            except ValueError as e:
+                add_log(f"Error combining frames: {e}")
+                # Print frame dimensions for debugging
+                for i, frame in enumerate(frames):
+                    add_log(f"Frame {i} dimensions: {frame.shape}")
             time.sleep(.5)
         else:
             time.sleep(0.1)
