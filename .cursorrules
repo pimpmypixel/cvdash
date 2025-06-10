@@ -1,0 +1,42 @@
+[project]
+type = "cli"
+language = "python"
+description = "Python CLI app for webcam-based pattern recognition and browser automation."
+
+[dependencies]
+# Image and video processing
+opencv-python = true
+
+# Asynchronous programming
+asyncio = true
+
+# Threading support
+threading = true
+
+# Webcam capture (built into OpenCV but highlighted for clarity)
+webcam_capture = true
+
+# Pattern recognition via OpenCV
+opencv_pattern_recognition = true
+
+# Browser automation
+playwright = { browser = "chromium", headless = true }
+
+[structure]
+entrypoint = "main.py"
+modules = ["camera", "recognition", "automation", "utils"]
+uses_threads = true
+uses_asyncio = true
+
+[tools]
+opencv = { version = "latest", features = ["video", "imgproc"] }
+playwright = { install = true, browser = ["chromium"] }
+
+[dev]
+formatting = ["black"]
+linting = ["ruff", "mypy"]
+testing = ["pytest"]
+
+[notes]
+# This app captures webcam input via OpenCV, processes it for pattern recognition,
+# and performs browser automation tasks using Playwright (Chromium).
