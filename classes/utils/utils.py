@@ -44,9 +44,9 @@ def draw_status_overlay_column(frame, status):
         cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
     return frame
 
-def draw_graph_column(history, webcam_history=None):
+def draw_graph_column(stream_history, webcam_history=None):
     graph = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
-    if not history and not webcam_history:
+    if not stream_history and not webcam_history:
         return graph
 
     # Draw color bars from right to left
@@ -56,8 +56,8 @@ def draw_graph_column(history, webcam_history=None):
     
     # Draw webcam color history
     if webcam_history:
-        y_start = (c.window_height - bar_height) // 2  # Center vertically
-        cv2.putText(graph, 'Webcam', (c.window_width - 40, y_start - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
+        y_start = c.window_height - bar_height - 70
+        cv2.putText(graph, 'Webcam', (c.window_width - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
         
         for color_data in reversed(webcam_history):  # Process colors from newest to oldest
             if x_start < 0:  # Stop if we've reached the left edge
@@ -76,11 +76,11 @@ def draw_graph_column(history, webcam_history=None):
     x_start = c.window_width - 1
     
     # Draw stream color history
-    if history:
-        y_start = c.window_height - bar_height - 30  # Position above webcam history
-        cv2.putText(graph, 'Stream', (c.window_width - 40, y_start - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
+    if stream_history:
+        y_start = c.window_height - bar_height - 10  # Position above webcam history
+        cv2.putText(graph, 'Stream', (c.window_width - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
         
-        for color_data in reversed(history):  # Process colors from newest to oldest
+        for color_data in reversed(stream_history):  # Process colors from newest to oldest
             if x_start < 0:  # Stop if we've reached the left edge
                 break
                 

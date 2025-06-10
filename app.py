@@ -10,6 +10,7 @@ from classes.utils.utils import draw_status_overlay_column, draw_graph_column
 from classes.utils.utils import add_log, draw_log_panel
 from classes.opencv.process_stream import process_browser_frame
 from classes.opencv.process_camera import process_webcam_frame
+from classes.opencv.process_color_history import compare_color_fluctuations
 import config.config as c
 
 SHOW_WINDOW = True
@@ -21,8 +22,8 @@ def main():
     global USE_WEBCAM, USE_BROWSER
 
 # Color tracking
-    stream_avg_colors_q = Queue(maxsize=c.window_width)
-    webcam_avg_colors_q = Queue(maxsize=c.window_width)
+    stream_avg_colors_q = Queue(400)
+    webcam_avg_colors_q = Queue(400)
     browser_q = Queue(maxsize=5)
     webcam_q = Queue(maxsize=5)
     stats = GraphData(stream_avg_colors_q)
@@ -40,21 +41,26 @@ def main():
     while True:
         frames = []
         # Update frames if enabled and available
-        if USE_WEBCAM and not webcam_q.empty():
-            raw_webcam = webcam_q.get()
-            webcam_frame = process_webcam_frame(raw_webcam, webcam_avg_colors_q)
-            webcam_resized = cv2.resize(webcam_frame, (c.window_width_webcam, c.window_height))
-            frames.append(webcam_resized)
-
         if USE_BROWSER and not browser_q.empty():
             raw_browser = browser_q.get()
             browser_frame = process_browser_frame(raw_browser, stream_avg_colors_q)
             browser_resized = cv2.resize(browser_frame, (c.window_width, c.window_height))
             frames.append(browser_resized)
 
+        if USE_WEBCAM and not webcam_q.empty():
+            raw_webcam = webcam_q.get()
+            webcam_frame = process_webcam_frame(raw_webcam, webcam_avg_colors_q)
+            webcam_resized = cv2.resize(webcam_frame, (c.window_width_webcam, c.window_height))
+            frames.append(webcam_resized)
+
+        color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q)
+        for key, value in color_comparison.items():
+            add_log(f"{key}: {value}")
+        
+
         # Status/graph column
         stats_column = draw_graph_column(stats.get_history(), webcam_stats.get_history())
-        stats_column = draw_status_overlay_column(stats_column, stats.get_status())
+        # stats_column = draw_status_overlay_column(stats_column, stats.get_status())
         frames.append(stats_column)
 
         # Log panel column
