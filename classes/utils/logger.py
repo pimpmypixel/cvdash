@@ -33,13 +33,6 @@ logger.addHandler(file_handler)
 LOG_LINES = []
 MAX_LOG_LINES = 20
 
-def append_to_log_file(message):
-    """Append a message to the storage/log.txt file. Create the file if it doesn't exist."""
-    os.makedirs('storage', exist_ok=True)
-    log_message = f"{message}\n"
-    with open('storage/log.txt', 'a', encoding='utf-8') as f:
-        f.write(log_message)
-
 def add_log(message, level='info'):
     """Add a log message with the specified level and update UI panel."""
     global LOG_LINES
@@ -52,9 +45,6 @@ def add_log(message, level='info'):
     LOG_LINES.append(message)
     if len(LOG_LINES) > MAX_LOG_LINES:
         LOG_LINES.pop(0)
-    
-    # Write to log file
-    append_to_log_file(message)
     
     # Log with appropriate level
     if level.lower() == 'debug':

@@ -14,13 +14,14 @@ from classes.opencv.process_color_history import compare_color_fluctuations
 import config.config as c
 
 SHOW_WINDOW = True
-USE_WEBCAM = True
-USE_BROWSER = False
+LOG_PANEL = True
+USE_WEBCAM = False
+USE_BROWSER = True
 HEADLESS_BROWSER = True
 COMPARE_COLORS = False
 
 def main():
-    global USE_WEBCAM, USE_BROWSER, COMPARE_COLORS
+    global USE_WEBCAM, USE_BROWSER, COMPARE_COLORS, LOG_PANEL, HEADLESS_BROWSER, SHOW_WINDOW
     window_width_webcam = c.window_width_webcam
 
     webcam_dimensions = is_webcam_accessible()
@@ -78,8 +79,9 @@ def main():
         )
         frames.append(stats_column)
 
-        log_panel = draw_log_panel()
-        frames.append(log_panel)
+        if LOG_PANEL:
+            log_panel = draw_log_panel()
+            frames.append(log_panel)
 
         if SHOW_WINDOW and frames:
             target_height = c.window_height
@@ -100,11 +102,14 @@ def main():
                     add_log(f"Webcam toggled {'ON' if USE_WEBCAM else 'OFF'}")
                     if USE_WEBCAM:
                         Thread(target=capture_webcam, args=(webcam_q,), daemon=True).start()
+                elif key == ord('l'):
+                    LOG_PANEL = not LOG_PANEL
+                    add_log(f"Log panel toggled {'ON' if LOG_PANEL else 'OFF'}")
                 elif key == ord('b'):
                     USE_BROWSER = not USE_BROWSER
                     add_log(f"Browser toggled {'ON' if USE_BROWSER else 'OFF'}")
                     if USE_BROWSER:
-                        Thread(target=capture_browser, args=(browser_q,), daemon=True).start()
+                        Thread(target=capture_browser, args=(browser_q, HEADLESS_BROWSER), daemon=True).start()
                 elif key == ord('r'):
                     reset_detection()
                     while not webcam_avg_colors_q.empty():

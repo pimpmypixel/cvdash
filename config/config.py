@@ -18,18 +18,18 @@ max_confidence = 1.0
 min_confidence = 0.0
 
 # Detection thresholds
-min_red_pixels = 15  # Minimum red pixels to consider logo present
-min_contour_area = 20  # Minimum contour area for circular shape
-detection_threshold = 0.4  # Confidence threshold for detection
+min_red_pixels = 10  # Reduced minimum red pixels to consider logo present
+min_contour_area = 15  # Reduced minimum contour area for circular shape
+detection_threshold = 0.35  # Slightly reduced confidence threshold for detection
 
 # Color ranges
-lower_blue = np.array([100, 150, 50])    # Blue range
+lower_blue = np.array([100, 100, 50])    # More lenient blue range
 upper_blue = np.array([130, 255, 255])
 
-lower_red1 = np.array([0, 120, 70])      # Red range (backup)
+lower_red1 = np.array([0, 100, 50])      # More lenient red range
 upper_red1 = np.array([10, 255, 255])
 
-lower_red2 = np.array([170, 120, 70])    
+lower_red2 = np.array([170, 100, 50])    # More lenient red range
 upper_red2 = np.array([180, 255, 255])
 
 
