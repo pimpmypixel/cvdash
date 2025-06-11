@@ -3,36 +3,18 @@ import numpy as np
 import time
 import os
 import config.config as c
+from classes.utils.logger import add_log, draw_log_panel
+from classes.opencv.process_camera_v4 import tv_box, detection_confidence, locked_roi
 
-# Log buffer for the 4th panel
-LOG_LINES = []
-MAX_LOG_LINES = 20
+# Add any utility functions here that don't create circular dependencies
+def format_timestamp(timestamp):
+    """Format a timestamp into a readable string."""
+    return timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
-def append_to_log_file(message):
-    """Append a message to the storage/log.txt file. Create the file if it doesn't exist."""
-    os.makedirs('storage', exist_ok=True)
-    log_message = f"{message}\n"
-    with open('storage/log.txt', 'a', encoding='utf-8') as f:
-        f.write(log_message)
-
-def add_log(message):
-    global LOG_LINES
-    timestamp = time.strftime("%H:%M:%S")
-    message = f"[{timestamp}] {message}"
-    LOG_LINES.append(message)
-    append_to_log_file(message)
-    if len(LOG_LINES) > MAX_LOG_LINES:
-        LOG_LINES.pop(0)
-
-def draw_log_panel():
-    panel = np.zeros((c.window_height, c.window_width // 2, 3), dtype=np.uint8) + 20
-    y0 = 20
-    dy = 10
-    for i, line in enumerate(LOG_LINES):
-        y = y0 + i * dy
-        # cv2.putText(panel, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(panel, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
-    return panel
+def validate_config(config_dict):
+    """Validate configuration dictionary."""
+    required_keys = ['window_width', 'window_height']
+    return all(key in config_dict for key in required_keys)
 
 def draw_status_overlay_column(frame, status):
     y0 = 20
@@ -40,13 +22,10 @@ def draw_status_overlay_column(frame, status):
     for i, (key, value) in enumerate(status.items()):
         y = y0 + i * dy
         text = f"{key}: {value}"
-        # cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 2)
         cv2.putText(frame, text, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
     return frame
 
-def draw_graph_column(stream_history, webcam_history=None, compare_colors=False):
-    from classes.utils.state import state, get_running_time
-    
+def draw_graph_column(stream_history, webcam_history=None, compare_colors=False, stream_enabled=False, webcam_enabled=False):
     graph = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
     if not stream_history and not webcam_history:
         return graph
@@ -62,24 +41,31 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False)
     current_time = time.strftime("%H:%M:%S")
     ntp_time = time.strftime("%H:%M:%S")  # TODO: Replace with actual NTP time
     
-    # Get TV ROI status
-    from classes.opencv.process_camera_v2 import is_tv_roi_locked
-    tv_roi_status = "Locked" if is_tv_roi_locked() else "Detecting"
+    # Get TV ROI status from v4
+    if locked_roi is not None:
+        tv_roi_status = "Locked"
+    elif tv_box is not None:
+        tv_roi_status = f"Detecting ({detection_confidence*100:.0f}%)"
+    else:
+        tv_roi_status = "Not Detected"
     
-    # Get logo detection status
-    from classes.opencv.process_camera_v2 import is_logo_detected
-    logo_status = "Detected" if is_logo_detected() else "Not Detected"
+    # Get logo detection status from stream history
+    logo_status = "TV"  # Default to TV
+    if stream_history:
+        # Get the most recent entry that has a status
+        for entry in reversed(stream_history):
+            if entry[3] is not None:  # Check if status exists
+                logo_status = entry[3]
+                break
     
     # Table rows
     rows = [
-        ("Session", state['session_hash']),
         ("Logo Detected", logo_status),
-        ("Compare Colors", "Enabled" if state['compare_colors'] else "Disabled"),
-        ("Stream Queue", str(state['stream_queue_size'])),
-        ("Webcam Queue", str(state['webcam_queue_size'])),
-        ("Running Time", get_running_time()),
+        ("Compare Colors [c]", "Enabled" if compare_colors else "Disabled"),
+        ("Browser stream [b]", "Enabled" if stream_enabled else "Disabled"),
+        ("Webcam [w]", "Enabled" if webcam_enabled else "Disabled"),
         ("NTP Clock", ntp_time),
-        ("TV ROI", tv_roi_status)
+        ("TV ROI [r]", tv_roi_status)
     ]
     
     # Draw table
@@ -93,7 +79,7 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False)
     # Draw color bars from right to left
     bar_width = 1  # 1px width for each bar
     bar_height = 20  # 20px height for each bar
-    x_start = c.window_width - 1  # Start from right edge
+    x_start = c.window_width - 1
     
     # Draw webcam color history
     if webcam_history:
@@ -147,3 +133,5 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False)
             x_start -= bar_width  # Move left for next bar
     
     return graph
+
+# Add other utility functions as needed
