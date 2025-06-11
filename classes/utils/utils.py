@@ -45,14 +45,16 @@ def draw_status_overlay_column(frame, status):
     return frame
 
 def draw_graph_column(stream_history, webcam_history=None, compare_colors=False):
+    from classes.utils.state import state, get_running_time
+    
     graph = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
     if not stream_history and not webcam_history:
         return graph
 
     # Draw status table at the top
     y_start = 20
-    dy = 20
-    font_scale = 0.4
+    dy = 15  # Reduced line height
+    font_scale = 0.3  # Reduced font size by 25%
     font_thickness = 1
     font = cv2.FONT_HERSHEY_SIMPLEX
     
@@ -61,20 +63,21 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False)
     ntp_time = time.strftime("%H:%M:%S")  # TODO: Replace with actual NTP time
     
     # Get TV ROI status
-    from classes.opencv.process_camera import is_tv_roi_locked
-    tv_roi_status = "Locked" if is_tv_roi_locked() else "Unlocked"
+    from classes.opencv.process_camera_v2 import is_tv_roi_locked
+    tv_roi_status = "Locked" if is_tv_roi_locked() else "Detecting"
     
     # Get logo detection status
-    from classes.opencv.process_camera import is_logo_detected
+    from classes.opencv.process_camera_v2 import is_logo_detected
     logo_status = "Detected" if is_logo_detected() else "Not Detected"
     
     # Table rows
     rows = [
-        ("Compare Colors", "Enabled" if compare_colors else "Disabled"),
+        ("Session", state['session_hash']),
         ("Logo Detected", logo_status),
-        ("Stream Queue", str(len(stream_history))),
-        ("Webcam Queue", str(len(webcam_history) if webcam_history else 0)),
-        ("Running Time", current_time),
+        ("Compare Colors", "Enabled" if state['compare_colors'] else "Disabled"),
+        ("Stream Queue", str(state['stream_queue_size'])),
+        ("Webcam Queue", str(state['webcam_queue_size'])),
+        ("Running Time", get_running_time()),
         ("NTP Clock", ntp_time),
         ("TV ROI", tv_roi_status)
     ]

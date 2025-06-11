@@ -4,12 +4,12 @@ import time
 from queue import Queue
 from threading import Thread
 from classes.browser.browser_capture import capture_browser
-from classes.camera.webcam_capture import capture_webcam
+from classes.camera.webcam_capture import capture_webcam, is_webcam_accessible
 from classes.dashboard.graph_data import GraphData
 from classes.utils.utils import draw_status_overlay_column, draw_graph_column
 from classes.utils.utils import add_log, draw_log_panel
 from classes.opencv.process_stream import process_browser_frame
-from classes.opencv.process_camera import process_webcam_frame
+from classes.opencv.process_camera_v2 import process_webcam_frame
 from classes.opencv.process_color_history import compare_color_fluctuations
 import config.config as c
 
@@ -19,8 +19,21 @@ USE_BROWSER = True
 HEADLESS_BROWSER = True
 COMPARE_COLORS = False
 
+
 def main():
     global USE_WEBCAM, USE_BROWSER, COMPARE_COLORS
+    window_width_webcam = c.window_width_webcam
+
+    webcam_dimensions = is_webcam_accessible()
+    # Check webcam accessibility before starting
+    if USE_WEBCAM and not webcam_dimensions:
+        USE_WEBCAM = False
+        add_log("Webcam disabled due to accessibility issues")
+    else: 
+        window_width_webcam = int((c.window_height / webcam_dimensions[0]) * webcam_dimensions[1])
+    
+    
+    
 
     # Color tracking
     stream_avg_colors_q = Queue(400)
@@ -53,7 +66,7 @@ def main():
         if USE_WEBCAM and not webcam_q.empty():
             raw_webcam = webcam_q.get()
             webcam_frame = process_webcam_frame(raw_webcam, webcam_avg_colors_q)
-            webcam_resized = cv2.resize(webcam_frame, (c.window_width_webcam, c.window_height))
+            webcam_resized = cv2.resize(webcam_frame, (window_width_webcam, c.window_height))
             frames.append(webcam_resized)
 
         # Debug queue sizes

@@ -3,6 +3,8 @@ import numpy as np
 ratio_16_9 = .5625
 ratio_webcam = .75
 
+webcam_index=1
+
 window_height = 300
 window_width = int(window_height / ratio_16_9)   # 16:9
 window_width_webcam = int(window_height / ratio_webcam)   # 16:9
