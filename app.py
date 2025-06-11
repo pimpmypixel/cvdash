@@ -32,8 +32,6 @@ def main():
     else: 
         window_width_webcam = int((c.window_height / webcam_dimensions[0]) * webcam_dimensions[1])
     
-    
-    
 
     # Color tracking
     stream_avg_colors_q = Queue(400)
