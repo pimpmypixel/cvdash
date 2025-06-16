@@ -7,14 +7,14 @@ from classes.browser.browser_capture import capture_browser
 from classes.camera.webcam_capture import capture_webcam, is_webcam_accessible
 from classes.dashboard.graph_data import GraphData
 from classes.utils.utils import draw_status_overlay_column, draw_graph_column
-from classes.utils.utils import add_log, draw_log_panel
+from classes.utils.logger import add_log
 from classes.opencv.process_stream import process_browser_frame
 from classes.opencv.process_camera_v4 import process_webcam_frame, reset_detection
 from classes.opencv.process_color_history import compare_color_fluctuations
 import config.config as c
 
 SHOW_WINDOW = True
-LOG_PANEL = True
+# LOG_PANEL = True
 USE_WEBCAM = False
 USE_BROWSER = True
 HEADLESS_BROWSER = True
@@ -25,11 +25,12 @@ def main():
     window_width_webcam = c.window_width_webcam
 
     webcam_dimensions = is_webcam_accessible()
-    if USE_WEBCAM and not webcam_dimensions:
-        USE_WEBCAM = False
-        add_log("Webcam disabled due to accessibility issues")
-    else:
-        window_width_webcam = int((c.window_height / webcam_dimensions[0]) * webcam_dimensions[1])
+    if USE_WEBCAM:
+        if not webcam_dimensions:
+            USE_WEBCAM = False
+            add_log("Webcam disabled due to accessibility issues")
+        else:
+            window_width_webcam = int((c.window_height / webcam_dimensions[0]) * webcam_dimensions[1])
 
     stream_avg_colors_q = Queue(100)
     webcam_avg_colors_q = Queue(100)
@@ -79,9 +80,9 @@ def main():
         )
         frames.append(stats_column)
 
-        if LOG_PANEL:
-            log_panel = draw_log_panel()
-            frames.append(log_panel)
+        # if LOG_PANEL:
+        #     log_panel = draw_log_panel()
+        #     frames.append(log_panel)
 
         if SHOW_WINDOW and frames:
             target_height = c.window_height

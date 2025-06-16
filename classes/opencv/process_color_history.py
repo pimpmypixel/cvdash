@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import pearsonr
 import colorsys
 from queue import Queue
-from classes.utils.utils import add_log
+from classes.utils.logger import add_log
 from typing import List, Tuple, Optional
 
 def queue_to_array(rgb_queue: Queue) -> np.ndarray:

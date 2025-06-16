@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from classes.utils.utils import add_log
+from classes.utils.logger import add_log
 import time
 import os
 import json

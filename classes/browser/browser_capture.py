@@ -6,7 +6,7 @@ import time
 import pickle
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
-from classes.utils.utils import add_log
+from classes.utils.logger import add_log
 
 def capture_browser(queue, headless):
     with sync_playwright() as p:
@@ -79,13 +79,41 @@ def capture_browser(queue, headless):
             time.sleep(60)
             raise
 
+        consecutive_failures = 0
+        max_failures = 5
+
         while True:
-            screenshot = page.screenshot()
-            img_array = np.frombuffer(screenshot, dtype=np.uint8)
-            frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-            if frame is not None:
-                queue.put(frame)
-            time.sleep(0.1) 
+            try:
+                # Check if video is still playing
+                if not is_video_playing(page, "video"):
+                    add_log("Video stopped playing, attempting to restart...")
+                    page.reload()
+                    time.sleep(2)
+                    continue
+
+                # Capture frame
+                screenshot = page.screenshot()
+                img_array = np.frombuffer(screenshot, dtype=np.uint8)
+                frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                
+                if frame is not None and frame.size > 0:
+                    queue.put(frame)
+                    consecutive_failures = 0
+                else:
+                    add_log("Failed to decode frame from screenshot (frame is None or empty)")
+                    consecutive_failures += 1
+
+                # If too many consecutive failures, try to recover
+                if consecutive_failures >= max_failures:
+                    add_log("Too many consecutive failures, attempting to recover browser stream...")
+                    page.reload()
+                    time.sleep(2)
+                    consecutive_failures = 0
+
+            except Exception as e:
+                add_log(f"Error capturing frame: {e}")
+                consecutive_failures += 1
+                time.sleep(1)  # Wait a bit before retrying
 
 def handle_login(page):
     """Handle TV2-specific login process."""

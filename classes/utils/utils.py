@@ -3,7 +3,7 @@ import numpy as np
 import time
 import os
 import config.config as c
-from classes.utils.logger import add_log, draw_log_panel
+# from classes.utils.logger import add_log, draw_log_panel
 from classes.opencv.process_camera_v4 import tv_box, detection_confidence, locked_roi
 
 # Add any utility functions here that don't create circular dependencies
@@ -26,7 +26,8 @@ def draw_status_overlay_column(frame, status):
     return frame
 
 def draw_graph_column(stream_history, webcam_history=None, compare_colors=False, stream_enabled=False, webcam_enabled=False):
-    graph = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
+    # Create graph with half width
+    graph = np.zeros((c.window_height, c.window_width // 2, 3), dtype=np.uint8)
     if not stream_history and not webcam_history:
         return graph
 
@@ -74,20 +75,26 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
         # Draw label
         cv2.putText(graph, label, (10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
         # Draw value
-        cv2.putText(graph, value, (c.window_width // 2 + 10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
+        cv2.putText(graph, value, (c.window_width // 4 + 10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
 
-    # Draw color bars from right to left
-    bar_width = 1  # 1px width for each bar
+    # Calculate bar dimensions
+    bar_width = 2  # Increased from 1 to 2 pixels for better visibility
     bar_height = 20  # 20px height for each bar
-    x_start = c.window_width - 1
+    max_bars = (c.window_width // 2) // bar_width  # Maximum number of bars that can fit
     
     # Draw webcam color history
     if webcam_history:
         y_start = c.window_height - bar_height - 70
-        cv2.putText(graph, 'Webcam', (c.window_width - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
+        cv2.putText(graph, 'Webcam', (c.window_width // 2 - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
         
-        for color_data in reversed(webcam_history):  # Process colors from newest to oldest
-            if x_start < 0:  # Stop if we've reached the left edge
+        # Ensure we only keep the most recent max_bars entries
+        if len(webcam_history) > max_bars:
+            webcam_history = webcam_history[-max_bars:]
+        
+        # Draw bars from right to left
+        for i, color_data in enumerate(reversed(webcam_history)):
+            x_start = c.window_width // 2 - (i + 1) * bar_width
+            if x_start < 0:
                 break
                 
             # Draw the color bar
@@ -96,19 +103,20 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
                          (x_start + bar_width, y_start + bar_height),
                          color_data,  # Use the RGB color from history
                          -1)  # Fill the rectangle
-            
-            x_start -= bar_width  # Move left for next bar
-    
-    # Reset x_start for stream history
-    x_start = c.window_width - 1
     
     # Draw stream color history
     if stream_history:
-        y_start = c.window_height - bar_height - 10  # Position above webcam history
-        cv2.putText(graph, 'Stream', (c.window_width - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
+        y_start = c.window_height - bar_height - 10
+        cv2.putText(graph, 'Stream', (c.window_width // 2 - 40, y_start - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
         
-        for color_data in reversed(stream_history):  # Process colors from newest to oldest
-            if x_start < 0:  # Stop if we've reached the left edge
+        # Ensure we only keep the most recent max_bars entries
+        if len(stream_history) > max_bars:
+            stream_history = stream_history[-max_bars:]
+        
+        # Draw bars from right to left
+        for i, color_data in enumerate(reversed(stream_history)):
+            x_start = c.window_width // 2 - (i + 1) * bar_width
+            if x_start < 0:
                 break
                 
             # Extract color and state data
@@ -118,19 +126,17 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
             cv2.rectangle(graph, 
                          (x_start, y_start),
                          (x_start + bar_width, y_start + bar_height),
-                         (r, g, b),  # Use the RGB color from history
+                         (b, g, r),  # Use BGR color for OpenCV
                          -1)  # Fill the rectangle
             
             # If this is a state change point (state is not None), draw a white marker
             if state is not None:
-                marker_y = y_start - 5  # Position marker above the color bar
+                marker_y = y_start - 5
                 cv2.line(graph,
                         (x_start, marker_y),
-                        (x_start, marker_y + 10),  # 10px tall marker
-                        (255, 255, 255),  # White color
-                        1)  # 1px width
-            
-            x_start -= bar_width  # Move left for next bar
+                        (x_start, marker_y + 10),
+                        (255, 255, 255),
+                        1)
     
     return graph
 

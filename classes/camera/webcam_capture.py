@@ -2,7 +2,7 @@ import cv2
 import time
 from queue import Queue
 import config.config as c
-from classes.utils.utils import add_log
+from classes.utils.logger import add_log
 
 def capture_webcam(queue: Queue):
     cap = cv2.VideoCapture(1)

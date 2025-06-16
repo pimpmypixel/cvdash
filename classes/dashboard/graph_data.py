@@ -9,27 +9,24 @@ class GraphData:
         self.lock = threading.Lock()
         self.color_queue = color_queue
         self.last_queue_size = 0
+        self.max_history_size = 100
 
     def update_loop(self):
         while True:
             with self.lock:
-                current_size = self.color_queue.qsize()
-                
-                # Only process new items
-                if current_size > self.last_queue_size:
-                    # Get only the new items
-                    for _ in range(current_size - self.last_queue_size):
-                        if not self.color_queue.empty():
-                            item = self.color_queue.get()
-                            self.history.append(item)
-                            # Put the item back
-                            self.color_queue.put(item)
-                    
-                    # Keep only the last 100 colors
-                    if len(self.history) > 100:
-                        self.history = self.history[-100:]
-                    
-                    self.last_queue_size = current_size
+                try:
+                    # Get the latest color from the queue
+                    if not self.color_queue.empty():
+                        item = self.color_queue.get()
+                        # Add to history
+                        self.history.append(item)
+                        # Keep history size limited
+                        if len(self.history) > self.max_history_size:
+                            self.history = self.history[-self.max_history_size:]
+                        # Put the item back in the queue
+                        self.color_queue.put(item)
+                except Exception as e:
+                    print(f"Error in update_loop: {e}")
                 
                 self.status['fps'] = 30  # Placeholder
             time.sleep(0.1)

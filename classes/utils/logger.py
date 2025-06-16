@@ -29,6 +29,9 @@ file_handler.setFormatter(log_format)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+# Prevent propagation to root logger to avoid duplicate logs
+logger.propagate = False
+
 # Log buffer for the UI panel
 LOG_LINES = []
 MAX_LOG_LINES = 20
@@ -60,12 +63,12 @@ def add_log(message, level='info'):
     else:
         logger.info(message)  # Default to info level
 
-def draw_log_panel():
-    """Draw the log panel for the UI."""
-    panel = np.zeros((c.window_height, c.window_width // 2, 3), dtype=np.uint8) + 20
-    y0 = 20
-    dy = 10
-    for i, line in enumerate(LOG_LINES):
-        y = y0 + i * dy
-        cv2.putText(panel, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
-    return panel 
+# def draw_log_panel():
+#     """Draw the log panel for the UI."""
+#     panel = np.zeros((c.window_height, c.window_width // 2, 3), dtype=np.uint8) + 20
+#     y0 = 20
+#     dy = 10
+#     for i, line in enumerate(LOG_LINES):
+#         y = y0 + i * dy
+#         cv2.putText(panel, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (200,200,200), 1, cv2.LINE_8)
+#     return panel 
