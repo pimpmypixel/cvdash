@@ -21,56 +21,9 @@ confidence = c.min_confidence  # Initialize with minimum confidence
 frames_since_state_change = 0
 continuous_update_interval = 10  # Publish continuous updates every N frames
 
-# Create a directory for saving dark frames for debugging
-DEBUG_DARK_FRAMES_DIR = "./temp_dark_frames"
-if not os.path.exists(DEBUG_DARK_FRAMES_DIR):
-    os.makedirs(DEBUG_DARK_FRAMES_DIR)
-
-def debug_queue_contents(q: Queue, max_items=5):
-    """Log the contents of the queue for debugging"""
-    if q.empty():
-        add_log("Queue is empty")
-        return
-        
-    items = []
-    temp_q = Queue()
-    
-    # Get items from queue
-    while not q.empty():
-        try:
-            item = q.get_nowait()
-            items.append(item)
-            temp_q.put(item)
-        except queue.Empty:
-            break
-    
-    # Put items back
-    while not temp_q.empty():
-        q.put(temp_q.get())
-    
-    # Log the most recent items
-    add_log(f"Queue size: {len(items)}")
-    for i, item in enumerate(reversed(items[-max_items:])):
-        r, g, b, status, timestamp = item
-        if status is not None:
-            add_log(f"Item {i}: RGB({r},{g},{b}) - {status} at {timestamp}")
-        else:
-            add_log(f"Item {i}: RGB({r},{g},{b}) - No status")
-
 def process_browser_frame(frame, stream_avg_colors_q: Queue):
     if len(frame.shape) == 3:
         r, g, b = average_color(frame)
-
-        # Log the RGB values before adding to queue
-        add_log(f"Processing frame - RGB: ({r},{g},{b})")
-
-        # Debugging: Save frame if average color is very low (indicating a dark frame)
-        if r < 20 and g < 20 and b < 20:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            filename = os.path.join(DEBUG_DARK_FRAMES_DIR, f"dark_frame_{timestamp}.png")
-            cv2.imwrite(filename, frame)
-            add_log(f"Saved dark frame to {filename} - RGB: ({r},{g},{b})")
-
         roi = make_roi(frame)
         logo_confidence, color_mask, colored_pixels = detect_red_logo(roi)
         logo_detected, state_changed, render_frames_since_state_change, should_publish = publish_change(logo_confidence, colored_pixels)
@@ -82,8 +35,6 @@ def process_browser_frame(frame, stream_avg_colors_q: Queue):
             q[3] = status
             q[4] = time.time()
         
-        # Debugging: Monitor queue operations
-        add_log(f"Queue before put - size: {stream_avg_colors_q.qsize()}, full: {stream_avg_colors_q.full()}")
         if stream_avg_colors_q.full():
             try:
                 stream_avg_colors_q.get_nowait()
@@ -92,12 +43,6 @@ def process_browser_frame(frame, stream_avg_colors_q: Queue):
                 add_log("Attempted to remove from empty queue (shouldn't happen if full()).")
                 pass
         stream_avg_colors_q.put(q)
-        add_log(f"Item put into queue. New size: {stream_avg_colors_q.qsize()}")
-        
-        # Periodically log queue contents (every 100 frames)
-        if frames_since_state_change % 100 == 0:
-            debug_queue_contents(stream_avg_colors_q)
-
         return render_image(frame, logo_detected)
     
     return np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)

@@ -9,13 +9,14 @@ from classes.dashboard.graph_data import GraphData
 from classes.utils.utils import draw_status_overlay_column, draw_graph_column
 from classes.utils.logger import add_log
 from classes.opencv.process_stream import process_browser_frame
-from classes.opencv.process_camera_v4 import process_webcam_frame, reset_detection
+from classes.opencv.process_camera_v5 import process_webcam_frame, reset_detection
 from classes.opencv.process_color_history import compare_color_fluctuations
 import config.config as c
+import json
+from datetime import datetime
 
 SHOW_WINDOW = True
-# LOG_PANEL = True
-USE_WEBCAM = False
+USE_WEBCAM = True
 USE_BROWSER = True
 HEADLESS_BROWSER = True
 COMPARE_COLORS = False

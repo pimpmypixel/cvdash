@@ -1,6 +1,7 @@
 import time
 import threading
 from queue import Queue
+import config.config as c
 
 class GraphData:
     def __init__(self, color_queue: Queue):
@@ -9,7 +10,7 @@ class GraphData:
         self.lock = threading.Lock()
         self.color_queue = color_queue
         self.last_queue_size = 0
-        self.max_history_size = 100
+        self.max_history_size = c.window_width // 2  # Set max_history_size based on window width
 
     def update_loop(self):
         while True:
@@ -24,7 +25,7 @@ class GraphData:
                         if len(self.history) > self.max_history_size:
                             self.history = self.history[-self.max_history_size:]
                         # Put the item back in the queue
-                        self.color_queue.put(item)
+                        # self.color_queue.put(item) # REMOVED: Item should be consumed, not put back
                 except Exception as e:
                     print(f"Error in update_loop: {e}")
                 

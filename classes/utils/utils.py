@@ -4,7 +4,7 @@ import time
 import os
 import config.config as c
 # from classes.utils.logger import add_log, draw_log_panel
-from classes.opencv.process_camera_v4 import tv_box, detection_confidence, locked_roi
+from classes.opencv.process_camera_v5 import tv_box, detection_confidence, locked_roi
 
 # Add any utility functions here that don't create circular dependencies
 def format_timestamp(timestamp):
@@ -78,7 +78,7 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
         cv2.putText(graph, value, (c.window_width // 4 + 10, y), font, font_scale, (200,200,200), font_thickness, cv2.LINE_8)
 
     # Calculate bar dimensions
-    bar_width = 2  # Increased from 1 to 2 pixels for better visibility
+    bar_width = 1  # Single pixel width for precise visualization
     bar_height = 20  # 20px height for each bar
     max_bars = (c.window_width // 2) // bar_width  # Maximum number of bars that can fit
     
@@ -97,11 +97,14 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
             if x_start < 0:
                 break
                 
+            # Extract RGB values (first 3 elements)
+            r, g, b = color_data[:3]
+            
             # Draw the color bar
             cv2.rectangle(graph, 
                          (x_start, y_start),
                          (x_start + bar_width, y_start + bar_height),
-                         color_data,  # Use the RGB color from history
+                         (b, g, r),  # Use BGR color for OpenCV
                          -1)  # Fill the rectangle
     
     # Draw stream color history
@@ -119,8 +122,8 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
             if x_start < 0:
                 break
                 
-            # Extract color and state data
-            r, g, b, state, timestamp = color_data
+            # Extract RGB values (first 3 elements)
+            r, g, b = color_data[:3]
             
             # Draw the color bar
             cv2.rectangle(graph, 
@@ -130,7 +133,7 @@ def draw_graph_column(stream_history, webcam_history=None, compare_colors=False,
                          -1)  # Fill the rectangle
             
             # If this is a state change point (state is not None), draw a white marker
-            if state is not None:
+            if len(color_data) > 3 and color_data[3] is not None:
                 marker_y = y_start - 5
                 cv2.line(graph,
                         (x_start, marker_y),
