@@ -21,6 +21,10 @@ USE_BROWSER = True
 HEADLESS_BROWSER = True
 COMPARE_COLORS = False
 
+# --- Display Frame Rate Control ---
+TARGET_FPS = 30
+FRAME_INTERVAL = 1.0 / TARGET_FPS  # Time in seconds for each frame
+
 def main():
     global USE_WEBCAM, USE_BROWSER, COMPARE_COLORS, LOG_PANEL, HEADLESS_BROWSER, SHOW_WINDOW
     window_width_webcam = c.window_width_webcam
@@ -33,8 +37,9 @@ def main():
         else:
             window_width_webcam = int((c.window_height / webcam_dimensions[0]) * webcam_dimensions[1])
 
-    stream_avg_colors_q = Queue(100)
-    webcam_avg_colors_q = Queue(100)
+    max_history_size = c.window_width // 2  # Maximum number of color bars that can be displayed
+    stream_avg_colors_q = Queue(maxsize=max_history_size)
+    webcam_avg_colors_q = Queue(maxsize=max_history_size)
     browser_q = Queue(maxsize=5)
     webcam_q = Queue(maxsize=5)
     stats = GraphData(stream_avg_colors_q)
@@ -48,27 +53,38 @@ def main():
     Thread(target=stats.update_loop, daemon=True).start()
     Thread(target=webcam_stats.update_loop, daemon=True).start()
 
+    last_frame_time = time.time() # Initialize time tracking
+
     while True:
-        frames = []
+        current_time = time.time()
+
+        browser_frame_display = np.zeros((c.window_height, c.window_width, 3), dtype=np.uint8)
+        webcam_frame_display = np.zeros((c.window_height, window_width_webcam, 3), dtype=np.uint8)
 
         if USE_BROWSER and not browser_q.empty():
             raw_browser = browser_q.get()
             browser_frame = process_browser_frame(raw_browser, stream_avg_colors_q)
-            browser_resized = cv2.resize(browser_frame, (c.window_width, c.window_height))
-            frames.append(browser_resized)
+            browser_frame_display = cv2.resize(browser_frame, (c.window_width, c.window_height))
 
         if USE_WEBCAM and not webcam_q.empty():
             raw_webcam = webcam_q.get()
             webcam_frame = process_webcam_frame(raw_webcam, webcam_avg_colors_q)
-            webcam_resized = cv2.resize(webcam_frame, (window_width_webcam, c.window_height))
-            frames.append(webcam_resized)
+            webcam_frame_display = cv2.resize(webcam_frame, (window_width_webcam, c.window_height))
 
         stream_size = stream_avg_colors_q.qsize()
         webcam_size = webcam_avg_colors_q.qsize()
 
-        if COMPARE_COLORS and stream_size >= 50 and webcam_size >= 50:
+        if COMPARE_COLORS and len(stats.get_history()) >= 50 and len(webcam_stats.get_history()) >= 50:
             add_log('Comparing colors...')
-            color_comparison = compare_color_fluctuations(stream_avg_colors_q, webcam_avg_colors_q, similarity_threshold=.1)
+            # Create temporary queues with history data from GraphData
+            temp_queue1 = Queue()
+            temp_queue2 = Queue()
+            for item in stats.get_history():
+                temp_queue1.put(item)
+            for item in webcam_stats.get_history():
+                temp_queue2.put(item)
+            
+            color_comparison = compare_color_fluctuations(temp_queue1, temp_queue2, similarity_threshold=.1)
             for key, value in color_comparison.items():
                 print(f"{key}: {value}")
 
@@ -79,56 +95,66 @@ def main():
             webcam_enabled=USE_WEBCAM,
             stream_enabled=USE_BROWSER,
         )
-        frames.append(stats_column)
+        
+        # Assemble all frames for display, ensuring consistent dimensions
+        display_frames = []
+        if USE_BROWSER:
+            display_frames.append(browser_frame_display)
+        if USE_WEBCAM:
+            display_frames.append(webcam_frame_display)
+        display_frames.append(stats_column) # Stats column is always present
 
-        # if LOG_PANEL:
-        #     log_panel = draw_log_panel()
-        #     frames.append(log_panel)
+        # Calculate the total width for the combined frame
+        total_width = sum(frame.shape[1] for frame in display_frames)
 
-        if SHOW_WINDOW and frames:
-            target_height = c.window_height
-            for i in range(len(frames)):
-                if frames[i].shape[0] != target_height:
-                    frames[i] = cv2.resize(frames[i], (frames[i].shape[1], target_height))
-            try:
-                combined = np.hstack(frames)
-                cv2.imshow("Dashboard", combined)
-                key = cv2.waitKey(1) & 0xFF
+        try:
+            combined = np.hstack(display_frames)
+        except ValueError as e:
+            add_log(f"Error combining frames: {e}")
+            for i, frame in enumerate(display_frames):
+                add_log(f"Frame {i} dimensions: {frame.shape}")
+            # Fallback to a black frame if combination fails
+            combined = np.zeros((c.window_height, total_width, 3), dtype=np.uint8)
+        
+        if SHOW_WINDOW:
+            cv2.imshow("Dashboard", combined)
 
-                if key == ord('q'):
-                    add_log("Quitting application.")
-                    add_log("-" * 50)
-                    break
-                elif key == ord('w'):
-                    USE_WEBCAM = not USE_WEBCAM
-                    add_log(f"Webcam toggled {'ON' if USE_WEBCAM else 'OFF'}")
-                    if USE_WEBCAM:
-                        Thread(target=capture_webcam, args=(webcam_q,), daemon=True).start()
-                elif key == ord('l'):
-                    LOG_PANEL = not LOG_PANEL
-                    add_log(f"Log panel toggled {'ON' if LOG_PANEL else 'OFF'}")
-                elif key == ord('b'):
-                    USE_BROWSER = not USE_BROWSER
-                    add_log(f"Browser toggled {'ON' if USE_BROWSER else 'OFF'}")
-                    if USE_BROWSER:
-                        Thread(target=capture_browser, args=(browser_q, HEADLESS_BROWSER), daemon=True).start()
-                elif key == ord('r'):
-                    reset_detection()
-                    while not webcam_avg_colors_q.empty():
-                        webcam_avg_colors_q.get()
-                    while not stream_avg_colors_q.empty():
-                        stream_avg_colors_q.get()
-                    add_log("TV ROI reset and color queues cleared")
-                elif key == ord('c'):
-                    COMPARE_COLORS = not COMPARE_COLORS
-                    add_log(f"Color comparison {'ENABLED' if COMPARE_COLORS else 'DISABLED'}")
-            except ValueError as e:
-                add_log(f"Error combining frames: {e}")
-                for i, frame in enumerate(frames):
-                    add_log(f"Frame {i} dimensions: {frame.shape}")
-            time.sleep(.5)
-        else:
-            time.sleep(0.1)
+        key = cv2.waitKey(1) & 0xFF # Process key presses immediately
+
+        # --- Frame Rate Control Logic ---
+        time_elapsed = time.time() - current_time # Calculate time elapsed for the current frame
+        time_to_sleep = FRAME_INTERVAL - time_elapsed
+        if time_to_sleep > 0:
+            time.sleep(time_to_sleep)
+        last_frame_time = time.time() # Update last frame time for next iteration
+
+        if key == ord('q'):
+            add_log("Quitting application.")
+            add_log("-" * 50)
+            break
+        elif key == ord('w'):
+            USE_WEBCAM = not USE_WEBCAM
+            add_log(f"Webcam toggled {'ON' if USE_WEBCAM else 'OFF'}")
+            if USE_WEBCAM:
+                Thread(target=capture_webcam, args=(webcam_q,), daemon=True).start()
+        elif key == ord('l'):
+            LOG_PANEL = not LOG_PANEL
+            add_log(f"Log panel toggled {'ON' if LOG_PANEL else 'OFF'}")
+        elif key == ord('b'):
+            USE_BROWSER = not USE_BROWSER
+            add_log(f"Browser toggled {'ON' if USE_BROWSER else 'OFF'}")
+            if USE_BROWSER:
+                Thread(target=capture_browser, args=(browser_q, HEADLESS_BROWSER), daemon=True).start()
+        elif key == ord('r'):
+            reset_detection()
+            while not webcam_avg_colors_q.empty():
+                webcam_avg_colors_q.get()
+            while not stream_avg_colors_q.empty():
+                stream_avg_colors_q.get()
+            add_log("TV ROI reset and color queues cleared")
+        elif key == ord('c'):
+            COMPARE_COLORS = not COMPARE_COLORS
+            add_log(f"Color comparison {'ENABLED' if COMPARE_COLORS else 'DISABLED'}")
 
     if SHOW_WINDOW:
         cv2.destroyAllWindows()

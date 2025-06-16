@@ -30,7 +30,7 @@ class GraphData:
                     print(f"Error in update_loop: {e}")
                 
                 self.status['fps'] = 30  # Placeholder
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     def get_history(self):
         with self.lock:
